@@ -61,10 +61,10 @@ def test_package_publication_shows_suggestions_only_for_gaps(tmp_path):
     assert demo["schema"] == 1
     assert "way_out" not in old
     page = (site / "p" / "demo" / "index.html").read_text(encoding="utf-8")
-    assert "Pin to 1.4&lt;test&gt;, the last release with a wheel here." in page
+    assert "1.4&lt;test&gt; is the last release with a wheel here." in page
     assert "Upgrade to 2.1 for a wheel here." in page
     assert "never shown" not in page and "1.4<test>" not in page
-    assert "Pin to" not in (site / "p" / "older-snapshot" / "index.html").read_text(encoding="utf-8")
+    assert "the last release with a wheel here" not in (site / "p" / "older-snapshot" / "index.html").read_text(encoding="utf-8")
 
 
 @pytest.fixture

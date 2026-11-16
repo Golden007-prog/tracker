@@ -257,7 +257,8 @@ def page(
         detail = pyodide_locks.describe(bundled.get(targets[i]["label"])) if s == "bundled" else ""
         if s in GAP and (hint := way_out.get(targets[i]["label"])):
             if hint["kind"] == "older":
-                detail = f"Pin to {hint['release']}, the last release with a wheel here."
+                # A fact, not advice: that release may lack wheels the current one has on other platforms.
+                detail = f"{hint['release']} is the last release with a wheel here."
             elif hint["kind"] == "newer":
                 detail = f"Upgrade to {hint['release']} for a wheel here."
         small = f'<small class="bver">{e(detail)}</small>' if detail else ""
