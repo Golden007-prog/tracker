@@ -47,7 +47,7 @@ function renderMeta() {
     `wheelgap ${d.wheelgap} · download ranking from ${d.top_packages.last_update?.slice(0, 10) ?? "top-pypi-packages"}`;
   const pure = d.packages.filter((p) => p.pure).length;
   $("pure-note").textContent =
-    `${fmt(pure)} of the ${fmt(d.packages.length)} are pure Python and install everywhere; ` +
+    `${fmt(pure)} of the ${fmt(d.packages.length)} ship a pure Python wheel; ` +
     `the gaps are among the ${fmt(d.packages.length - pure)} with compiled code.`;
   const anyBundled = Object.values(d.summary ?? {}).some((s) => s && s.bundled > 0);
   const footer = pyodideFooter(state.pyodide, anyBundled);
@@ -79,7 +79,7 @@ function agreementText(a, now = Date.now()) {
       compiled.checks > 0 && compiled.matched <= compiled.checks) {
     text +=
       `, and on ${rateText(compiled.matched, compiled.checks)}% of the ${fmt(compiled.checks)} for the ` +
-      `${fmt(compiled.packages)} packages without a pure-Python wheel (the rest install everywhere)`;
+      `${fmt(compiled.packages)} packages without a pure-Python wheel (the rest ship one)`;
   }
   return `${text}. ${fmt(skipped)} skipped, ${fmt(errors)} without an answer from pip. `;
 }
@@ -250,7 +250,7 @@ function renderLookup(query, extra = null) {
   };
   $("lookup").innerHTML = `<div class="card">
     <h3>${esc(p.name)} <span class="ver">${esc(p.version ?? "")}</span></h3>
-    <p class="sub">#${esc(p.rank)} by downloads${p.pure ? " · pure Python: installs everywhere" : ""}${p.error ? ` · lookup failed: ${esc(p.error)}` : ""} ·
+    <p class="sub">#${esc(p.rank)} by downloads${p.pure ? " · pure Python wheel" : ""}${p.error ? ` · lookup failed: ${esc(p.error)}` : ""} ·
       <a href="p/${esc(canonicalName(p.name))}/">Package page</a> ·
       <a href="https://pypi.org/project/${encodeURIComponent(p.name)}/">PyPI</a></p>
     <div class="matrix-scroll"><table class="matrix">

@@ -40,6 +40,9 @@ def coverage(report: dict, name: str, version: str, label: str) -> dict:
     rows = report.get("packages")
     if not isinstance(rows, list):
         return not_checked()
+    # A package or target wheelgap left out (an `ignore` in a config file, a skipped requirement) isn't checked.
+    if any(report.get(key) for key in ("ignored", "ignored_targets", "skipped")):
+        return not_checked()
     root = False
     status = "wheel"
     blockers = []
@@ -61,6 +64,8 @@ def coverage(report: dict, name: str, version: str, label: str) -> dict:
             status = result
         if result != "wheel":
             via = row.get("via", {}).get(label, [])
+            if not isinstance(via, list) or not all(isinstance(step, str) and NAME.fullmatch(step) for step in via):
+                return not_checked()
             blockers.append({"name": package, "version": release, "status": result, "via": via})
     if not root:
         return not_checked()
@@ -76,28 +81,30 @@ def check(package: dict, targets: list[dict], deadline: float) -> dict:
     for target in targets:
         key = (target["python"], target["glibc"], target["musl"], target["macos"])
         groups.setdefault(key, []).append(target)
-    for (python, glibc, musl, macos), group in groups.items():
-        timeout = min(PACKAGE_TIMEOUT, deadline - time.monotonic())
-        if timeout <= 0:
-            break
-        platforms = ",".join(target["platform"] for target in group)
-        try:
-            process = subprocess.run(
-                [sys.executable, "-m", "wheelgap", f"{name}=={version}", "--deps", "--all", "--explain", "--json",
-                 "--no-notes", "-p", python, "-t", platforms, "--glibc", glibc, "--musl", musl, "--macos", macos],
-                capture_output=True, encoding="utf-8", timeout=timeout, check=False,
-            )
-            # 1 is a valid wheelgap report with gaps. 2 includes unsatisfied resolution.
-            if process.returncode not in (0, 1):
+    # From an empty folder, so no pyproject.toml's [tool.wheelgap] settings (an `ignore`, say) apply.
+    with tempfile.TemporaryDirectory() as empty:
+        for (python, glibc, musl, macos), group in groups.items():
+            timeout = min(PACKAGE_TIMEOUT, deadline - time.monotonic())
+            if timeout <= 0:
+                break
+            platforms = ",".join(target["platform"] for target in group)
+            try:
+                process = subprocess.run(
+                    [sys.executable, "-m", "wheelgap", f"{name}=={version}", "--deps", "--all", "--explain", "--json",
+                     "--no-notes", "-p", python, "-t", platforms, "--glibc", glibc, "--musl", musl, "--macos", macos],
+                    capture_output=True, encoding="utf-8", timeout=timeout, check=False, cwd=empty,
+                )
+                # 1 is a valid wheelgap report with gaps. 2 includes unsatisfied resolution.
+                if process.returncode not in (0, 1):
+                    continue
+                report = json.loads(process.stdout)
+                labels = {t["platform"]: t["label"] for t in report["targets"] if t["python"] == python}
+                for target in group:
+                    label = labels.get(target["platform"])
+                    if label is not None:
+                        results[target["label"]] = coverage(report, name, version, label)
+            except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError, AttributeError):
                 continue
-            report = json.loads(process.stdout)
-            labels = {target["platform"]: target["label"] for target in report["targets"] if target["python"] == python}
-            for target in group:
-                label = labels.get(target["platform"])
-                if label is not None:
-                    results[target["label"]] = coverage(report, name, version, label)
-        except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError, AttributeError):
-            continue
     return results
 
 
@@ -123,6 +130,8 @@ def scan(path: Path, top: int) -> int:
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
+    checked = sum(any(r["status"] != "not_checked" for r in p.get("install", {}).values()) for p in packages)
+    print(f"install coverage: checked {checked} of {len(packages)} packages", file=sys.stderr)
     return len(packages)
 
 

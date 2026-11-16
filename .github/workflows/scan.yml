@@ -50,8 +50,9 @@ jobs:
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.scan)
     runs-on: ubuntu-latest
     # A normal scan takes about a minute. If PyPI is down, each lookup retries with backoff,
-    # so cap the job instead of letting five slow attempts run to GitHub's 6-hour limit.
-    timeout-minutes: 60
+    # so cap the job instead of letting five slow attempts run to GitHub's 6-hour limit. The cap leaves room for the
+    # install-tree pass's own 25 minutes on top, so a slow night can't lose the core scan's commit.
+    timeout-minutes: 90
     concurrency:
       group: scan
       cancel-in-progress: false

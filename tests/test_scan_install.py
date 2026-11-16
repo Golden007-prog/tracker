@@ -1,5 +1,6 @@
 import json
 import subprocess
+from pathlib import Path
 from unittest.mock import Mock
 
 from scripts import scan_install
@@ -84,3 +85,27 @@ def test_scan_leaves_out_packages_with_nothing_checked(tmp_path, monkeypatch):
     })
     assert scan_install.scan(path, 1) == 1
     assert "install" not in json.loads(path.read_text(encoding="utf-8"))["packages"][0]
+
+
+def test_a_left_out_package_or_odd_path_is_not_checked():
+    rows = [{"name": "sample", "version": "1.0", "results": {"win-arm64": "wheel"}}]
+    for key in ("ignored", "ignored_targets", "skipped"):
+        report = {"packages": rows, key: ["something"]}
+        assert scan_install.coverage(report, "sample", "1.0", "win-arm64")["status"] == "not_checked", key
+    for via in ("sample", [1], ["sample", "<b>"]):
+        report = {"packages": rows + [
+            {"name": "dep", "version": "2.0", "results": {"win-arm64": "source"}, "via": {"win-arm64": via}},
+        ]}
+        assert scan_install.coverage(report, "sample", "1.0", "win-arm64")["status"] == "not_checked", via
+
+
+def test_check_runs_wheelgap_outside_the_repo(monkeypatch):
+    seen = []
+
+    def run(args, **kwargs):
+        seen.append(kwargs.get("cwd"))
+        return subprocess.CompletedProcess(args, 2, "")
+
+    monkeypatch.setattr(scan_install.subprocess, "run", run)
+    scan_install.check({"name": "sample", "version": "1.0"}, [target("3.14", "win-arm64")], float("inf"))
+    assert seen and seen[0] is not None and not (Path(seen[0]) / "pyproject.toml").exists()

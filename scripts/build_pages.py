@@ -201,7 +201,7 @@ def install_html(install: dict) -> str:
             if item["version"] is not None:
                 requirement += f"=={item['version']}"
             reason = "builds from source" if item["status"] == "source" else "has no distribution"
-            via = f" via <code>{e(' → '.join(item['via']))}</code>" if item["via"] else ""
+            via = f" via <code>{e(' → '.join(item['via']))}</code>" if len(item["via"]) > 1 else ""  # not for the root itself
             blockers.append(f"<li><code>{e(requirement)}</code> {reason}{via}</li>")
         details = f"<ul>{''.join(blockers)}</ul>" if blockers else ""
         rows.append(
