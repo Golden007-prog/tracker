@@ -30,7 +30,7 @@ permissions:
 env:
   # The wheelgap release that produces the data. Bump it to pick up new targets.
   WHEELGAP: "wheelgap==0.9.0"
-  # The install-tree pass needs --deps, introduced in 0.11.0. Keep the core scan's pin independent.
+  # The optional passes need 0.11.0 for --deps and the older-release fallback. Keep the core scan pin independent.
   WHEELGAP_INSTALL: "wheelgap==0.11.0"
   # The Pyodide releases whose own builds count as `bundled` (--pyodide-lock), one per Python the scan has a
   # pyodide target for. Each is a committed copy of the release's pyodide-lock.json, listed with its URL and
@@ -51,8 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     # A normal scan takes about a minute. If PyPI is down, each lookup retries with backoff,
     # so cap the job instead of letting five slow attempts run to GitHub's 6-hour limit. The cap leaves room for the
-    # install-tree pass's own 25 minutes on top, so a slow night can't lose the core scan's commit.
-    timeout-minutes: 90
+    # install-tree and release suggestion passes, so a slow night can't lose the core scan's commit.
+    timeout-minutes: 100
     concurrency:
       group: scan
       cancel-in-progress: false
@@ -85,6 +85,11 @@ jobs:
         continue-on-error: true
         timeout-minutes: 25
         run: uv run --no-project --with "$WHEELGAP_INSTALL" python scripts/scan_install.py data/coverage.json
+      - name: Find releases with wheels for known gaps
+        # Extra data. A slow or unavailable index must still leave the night's scan publishable.
+        continue-on-error: true
+        timeout-minutes: 7
+        run: uv run --no-project --with "$WHEELGAP_INSTALL" python scripts/scan_way_out.py data/coverage.json
       - name: Update history
         run: python3 scripts/update_history.py data/coverage.json data/history.json
       - name: Record the wheels gained and lost

@@ -236,6 +236,7 @@ def page(
     found is pyodide_locks.releases(scan): the Pyodide release behind each Python's bundled cells."""
     found = found or {}
     bundled = pyodide_locks.bundled(package, scan["targets"], found)
+    way_out = package.get("way_out", {})
     targets = scan["targets"]
     pys = list(dict.fromkeys(t["python"] for t in targets))
     platforms = [pl for pl in PLATFORM_NAMES if any(t["platform"] == pl for t in targets)]
@@ -254,6 +255,11 @@ def page(
             return '<td><span class="status s-none">n/a</span></td>'
         s = package["results"][i]
         detail = pyodide_locks.describe(bundled.get(targets[i]["label"])) if s == "bundled" else ""
+        if s in GAP and (hint := way_out.get(targets[i]["label"])):
+            if hint["kind"] == "older":
+                detail = f"Pin to {hint['release']}, the last release with a wheel here."
+            elif hint["kind"] == "newer":
+                detail = f"Upgrade to {hint['release']} for a wheel here."
         small = f'<small class="bver">{e(detail)}</small>' if detail else ""
         return f'<td><span class="status s-{e(s)}">{e(STATUS_TEXT.get(s, s))}</span>{small}</td>'
 

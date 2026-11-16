@@ -106,8 +106,9 @@ def build(
             ],
             "builds": sorted(({k: r[k] for k in BUILD_FIELDS} for r in lab.get(name, [])), key=lambda r: r["target"]),
         }
-        if "install" in p:
-            entry["install"] = p["install"]
+        for key in ("install", "way_out"):
+            if key in p:
+                entry[key] = p[key]
         write_json(out / f"{name}.json", entry)
         for r in lab.get(name, []):
             if r["version"] == p["version"]:  # the homepage shows only the current release's results
