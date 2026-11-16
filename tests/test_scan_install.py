@@ -73,3 +73,14 @@ def test_scan_adds_only_ranked_packages_and_chosen_targets(tmp_path, monkeypatch
     assert result["summary"] == scan["summary"]
     assert "install" not in result["packages"][0]
     assert set(result["packages"][1]["install"]) == {"3.14 win-arm64", "3.14t linux-x86_64"}
+
+
+def test_scan_leaves_out_packages_with_nothing_checked(tmp_path, monkeypatch):
+    path = tmp_path / "coverage.json"
+    scan = {"schema": 1, "targets": [target("3.14", "win-arm64")], "packages": [{"rank": 1, "name": "late"}]}
+    path.write_text(json.dumps(scan), encoding="utf-8")
+    monkeypatch.setattr(scan_install, "check", lambda package, targets, _deadline: {
+        t["label"]: scan_install.not_checked() for t in targets
+    })
+    assert scan_install.scan(path, 1) == 1
+    assert "install" not in json.loads(path.read_text(encoding="utf-8"))["packages"][0]

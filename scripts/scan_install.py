@@ -112,7 +112,10 @@ def scan(path: Path, top: int) -> int:
     deadline = time.monotonic() + SCAN_TIMEOUT
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         for package, results in zip(packages, pool.map(lambda p: check(p, targets, deadline), packages), strict=True):
-            package["install"] = results
+            # Nothing checked (the scan's deadline passed, or every lookup failed): leave the key out, as for a
+            # package outside the top, rather than a table of "Not checked" rows.
+            if any(r["status"] != "not_checked" for r in results.values()):
+                package["install"] = results
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as output:
         temporary = Path(output.name)
         output.write(json.dumps(data, separators=(",", ":")) + "\n")
