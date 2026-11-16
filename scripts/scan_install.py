@@ -131,7 +131,7 @@ def scan(path: Path, top: int) -> int:
     finally:
         temporary.unlink(missing_ok=True)
     checked = sum(any(r["status"] != "not_checked" for r in p.get("install", {}).values()) for p in packages)
-    print(f"install coverage: checked {checked} of {len(packages)} packages", file=sys.stderr)
+    print(f"install coverage: checked {checked} of {len(packages)} packages")
     return len(packages)
 
 
@@ -140,4 +140,4 @@ if __name__ == "__main__":
     parser.add_argument("coverage", type=Path)
     parser.add_argument("--top", type=int, choices=range(1, TOP + 1), default=TOP, metavar=f"1–{TOP}")
     args = parser.parse_args()
-    print(f"install coverage: {scan(args.coverage, args.top)} packages")
+    scan(args.coverage, args.top)

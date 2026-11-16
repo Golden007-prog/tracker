@@ -50,8 +50,8 @@ class RenderAgreementTests(unittest.TestCase):
         self.assertEqual(
             shown["text"],
             "Cross-checked against pip on 2026-11-12, with wheelgap's own tag lists on both sides: they agree on 99.8% "
-            "of 800 checks, and on 100% of the 144 for the 36 packages without a pure-Python wheel (the rest install "
-            "everywhere). 4 skipped, 1 without an answer from pip. ",
+            "of 800 checks, and on 100% of the 144 for the 36 packages without a pure-Python wheel (the rest ship "
+            "one). 4 skipped, 1 without an answer from pip. ",
         )
         self.assertEqual(shown["links"], [["a", "data/agreement.json", "Details"]])
 
