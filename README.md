@@ -61,12 +61,7 @@ It has the package's `name`, `version`, `rank`, `pure` and `error`, the scan's `
 
 For scanned packages, the package JSON also has an optional `install` map keyed by the same target labels as `results`. Each value has a `status` (`wheel`, `source`, `missing`, or `not_checked`) and a `blockers` list. Each blocker contains its `name`, `version` (or `null`), `status` (`source` or `missing`), and `via` dependency path from the root. The dependency scan covers selected native targets for up to the top 500 packages, highest-ranked first, within a time limit. It pins each root to the latest release in the coverage snapshot and resolves its dependencies without extras. A tree that wheelgap cannot resolve or verify, or one it leaves a package out of, is marked `not_checked`. wheelgap picks the newest matching release of each dependency without backtracking, so on a tree where pip would backtrack the two can differ. Older snapshots, packages outside the top 500 and packages none of whose targets could be checked omit the key. The package pages show the same install results alongside their individual wheel coverage.
 
-Some gap results have a `way_out` entry, keyed by the target label. For example,
-`{"3.14 win-arm64": {"release": "46.0.3", "kind": "older"}}` names the newest older release with a wheel
-there, within wheelgap's lookback. A `"newer"` entry names an upgrade with a wheel for that target which keeps
-the package's existing wheels on the scan targets. The nightly pass checks public PyPI release metadata once
-per affected package and leaves out hints it cannot verify. The package page shows the hint beside its gap.
-These hints cover the package's own wheels. Dependency status is shown in `install`.
+Some gap results have a `way_out` entry, keyed by the target label. For example, `{"3.14 win-arm64": {"release": "46.0.3", "kind": "older"}}` names the newest older release with a wheel there, within wheelgap's lookback. A `"newer"` entry names an upgrade with a wheel for that target which keeps the package's existing wheels on the scan targets. The nightly pass checks public PyPI release metadata once per affected package and leaves out hints it cannot verify. The package page shows the hint beside its gap. These hints cover the package's own wheels. Dependency status is shown in `install`.
 
 ## Badges
 
