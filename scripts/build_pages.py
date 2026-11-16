@@ -59,6 +59,12 @@ STATUS_TEXT = {
     "missing": "can't install",
     "unknown": "unknown",
 }
+INSTALL_STATUS = {
+    "wheel": ("wheel", "Wheels for the whole tree"),
+    "source": ("source", "Builds from source"),
+    "missing": ("missing", "Missing distribution"),
+    "not_checked": ("unknown", "Not checked"),
+}
 # Under the table when a result is `bundled` (wheelgap --pyodide-lock); same text as BUNDLED_NOTE in site/logic.js.
 BUNDLED_NOTE = (
     "bundled: there's no wheel on PyPI for Pyodide, but Pyodide ships its own build of this package, often an "
@@ -94,7 +100,7 @@ def describe(package: dict, columns: dict[str, int], python: str) -> str:
     if package.get("error"):
         return f"{name}: the latest wheelgap scan couldn't look this package up on PyPI."
     if package.get("pure"):
-        return f"{name} is pure Python: it installs on Linux, Alpine, macOS, Windows, ARM and Pyodide."
+        return f"{name} ships a pure Python wheel."
     by_status: dict[str, list[str]] = {}
     for platform, index in columns.items():
         by_status.setdefault(package["results"][index], []).append(PLATFORM_NAMES[platform])
@@ -181,6 +187,42 @@ def notes_html(notes: list[dict], name: str, gaps: list[str], today: str, exists
     return f'    <section class="notes">\n      <h2>Notes</h2>\n{intro}{"".join(cards)}{add}    </section>\n'
 
 
+def install_html(install: dict) -> str:
+    """Show the install result and dependency blockers for each checked target."""
+    if not install:
+        return ""
+    e = html.escape
+    rows = []
+    for target, result in install.items():
+        style, label = INSTALL_STATUS.get(result["status"], INSTALL_STATUS["not_checked"])
+        blockers = []
+        for item in result["blockers"]:
+            requirement = item["name"]
+            if item["version"] is not None:
+                requirement += f"=={item['version']}"
+            reason = "builds from source" if item["status"] == "source" else "has no distribution"
+            via = f" via <code>{e(' → '.join(item['via']))}</code>" if item["via"] else ""
+            blockers.append(f"<li><code>{e(requirement)}</code> {reason}{via}</li>")
+        details = f"<ul>{''.join(blockers)}</ul>" if blockers else ""
+        rows.append(
+            f'          <tr><th scope="row">{e(target)}</th>'
+            f'<td><span class="status s-{style}">{label}</span>{details}</td></tr>\n'
+        )
+    return (
+        '    <section aria-labelledby="install-coverage">\n'
+        '      <h2 id="install-coverage">Install coverage with dependencies</h2>\n'
+        '      <p>Wheelgap checks the scanned release and its dependencies without extras. A target is marked '
+        '“Not checked” if wheelgap could not resolve the full dependency tree or verify its packages.</p>\n'
+        '      <div class="matrix-scroll"><table class="matrix">\n'
+        '        <thead><tr><th scope="col">Target</th><th scope="col">Install result</th></tr></thead>\n'
+        '        <tbody>\n'
+        f'{"".join(rows)}'
+        '        </tbody>\n'
+        '      </table></div>\n'
+        '    </section>\n'
+    )
+
+
 def page(
     package: dict,
     scan: dict,
@@ -221,7 +263,7 @@ def page(
     )
     sub = f"#{package['rank']} by downloads"
     if package.get("pure"):
-        sub += " · pure Python: installs everywhere"
+        sub += " · pure Python wheel"
     if package.get("error"):
         sub += f" · lookup failed: {e(package['error'])}"
     sub += f' · <a href="https://pypi.org/project/{e(name)}/">PyPI</a>'
@@ -238,6 +280,7 @@ def page(
     notes_section = notes_html(
         shown, canonical(name), gap_platforms(package, targets), str(scan["generated"])[:10], note_file
     )
+    install_section = install_html(package.get("install", {}))
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -268,7 +311,7 @@ def page(
         </tbody>
       </table></div>{why}
     </div>
-{notes_section}    <p class="sub"><a href="../../#package={e(name)}">All {len(scan["packages"]):,} packages</a></p>
+{install_section}{notes_section}    <p class="sub"><a href="../../#package={e(name)}">All {len(scan["packages"]):,} packages</a></p>
   </main>
 </body>
 </html>

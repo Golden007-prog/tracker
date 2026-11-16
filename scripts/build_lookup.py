@@ -89,7 +89,7 @@ def build(
             print(f"::warning::build_lookup: skipping {p['name']!r}", file=sys.stderr)
             continue
         index[name] = p["version"]
-        write_json(out / f"{name}.json", {
+        entry = {
             "schema": SCHEMA,
             "name": name,
             "version": p["version"],
@@ -105,7 +105,10 @@ def build(
                 check_notes.as_json(n) for n in check_notes.current(notes.get(name, []), p, scan["targets"])
             ],
             "builds": sorted(({k: r[k] for k in BUILD_FIELDS} for r in lab.get(name, [])), key=lambda r: r["target"]),
-        })
+        }
+        if "install" in p:
+            entry["install"] = p["install"]
+        write_json(out / f"{name}.json", entry)
         for r in lab.get(name, []):
             if r["version"] == p["version"]:  # the homepage shows only the current release's results
                 current.append({"name": name, "rank": p["rank"], **r})

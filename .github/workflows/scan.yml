@@ -30,6 +30,8 @@ permissions:
 env:
   # The wheelgap release that produces the data. Bump it to pick up new targets.
   WHEELGAP: "wheelgap==0.9.0"
+  # The install-tree pass needs --deps, introduced in 0.11.0. Keep the core scan's pin independent.
+  WHEELGAP_INSTALL: "wheelgap==0.11.0"
   # The Pyodide releases whose own builds count as `bundled` (--pyodide-lock), one per Python the scan has a
   # pyodide target for. Each is a committed copy of the release's pyodide-lock.json, listed with its URL and
   # sha256 in pyodide/locks.json, so the scan never depends on a CDN and a Pyodide release doesn't change the
@@ -77,6 +79,11 @@ jobs:
         env:
           ALLOW_DROP: ${{ inputs.allow_drop && '1' || '' }}
         run: python3 scripts/check_scan.py data/coverage.json data/history.json "$TOP"
+      - name: Check install trees for the top 500 packages
+        # Extra data. Keep the core scan intact if the pinned tool or the optional pass fails.
+        continue-on-error: true
+        timeout-minutes: 25
+        run: uv run --no-project --with "$WHEELGAP_INSTALL" python scripts/scan_install.py data/coverage.json
       - name: Update history
         run: python3 scripts/update_history.py data/coverage.json data/history.json
       - name: Record the wheels gained and lost

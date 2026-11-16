@@ -1,0 +1,75 @@
+import json
+import subprocess
+from unittest.mock import Mock
+
+from scripts import scan_install
+
+
+def target(python, platform):
+    return {
+        "python": python, "platform": platform, "label": f"{python} {platform}",
+        "glibc": "2.36", "musl": "1.2", "macos": "14.0",
+    }
+
+
+def test_check_includes_transitive_blockers_and_unknown(monkeypatch):
+    targets = [target("3.14", "win-arm64"), target("3.14", "macos-arm64"), target("3.14", "linux-x86_64")]
+    invoked = []
+
+    def run(args, **kwargs):
+        invoked.append(args)
+        return subprocess.CompletedProcess(args, 1, json.dumps({
+            "targets": [{**t, "label": t["platform"]} for t in targets],
+            "packages": [
+                {"name": "sample", "version": "1.0", "results": dict.fromkeys([t["platform"] for t in targets], "wheel")},
+                {"name": "conditional", "version": "2.0",
+                 "results": {"win-arm64": "source", "macos-arm64": "unknown", "linux-x86_64": "n/a"},
+                 "via": {"win-arm64": ["sample", "middle", "conditional"]}},
+            ],
+        }))
+
+    monkeypatch.setattr(scan_install.subprocess, "run", run)
+    results = scan_install.check({"name": "sample", "version": "1.0"}, targets, float("inf"))
+    assert results == {
+        "3.14 win-arm64": {"status": "source", "blockers": [{
+            "name": "conditional", "version": "2.0", "status": "source", "via": ["sample", "middle", "conditional"],
+        }]},
+        "3.14 macos-arm64": {"status": "not_checked", "blockers": []},
+        "3.14 linux-x86_64": {"status": "wheel", "blockers": []},
+    }
+    assert len(invoked) == 1
+    assert invoked[0][3] == "sample==1.0"
+    assert invoked[0][invoked[0].index("--macos") + 1] == "14.0"
+
+
+def test_check_handles_timeout_and_refused_resolution(monkeypatch):
+    targets = [target("3.14", "win-arm64"), target("3.14t", "win-arm64")]
+    failures = [subprocess.TimeoutExpired("wheelgap", 1), subprocess.CompletedProcess([], 2, '{"error": {}}')]
+    monkeypatch.setattr(scan_install.subprocess, "run", Mock(side_effect=failures))
+    assert scan_install.check({"name": "sample", "version": "1.0"}, targets, float("inf")) == {
+        t["label"]: {"status": "not_checked", "blockers": []} for t in targets
+    }
+
+
+def test_root_must_be_checked_at_snapshot_version():
+    assert scan_install.coverage({"packages": [
+        {"name": "sample", "version": "2.0", "results": {"win-arm64": "wheel"}},
+    ]}, "sample", "1.0", "win-arm64")["status"] == "not_checked"
+    assert scan_install.coverage({"packages": []}, "sample", "1.0", "win-arm64")["status"] == "not_checked"
+
+
+def test_scan_adds_only_ranked_packages_and_chosen_targets(tmp_path, monkeypatch):
+    path = tmp_path / "coverage.json"
+    scan = {
+        "schema": 1, "targets": [target("3.14", "win-arm64"), target("3.15", "win-arm64"), target("3.14t", "linux-x86_64")],
+        "packages": [{"rank": 2, "name": "second"}, {"rank": 1, "name": "first"}], "summary": {"foo": {}},
+    }
+    path.write_text(json.dumps(scan), encoding="utf-8")
+    monkeypatch.setattr(scan_install, "check", lambda package, targets, _deadline: {
+        t["label"]: {"status": "wheel", "blockers": []} for t in targets
+    })
+    assert scan_install.scan(path, 1) == 1
+    result = json.loads(path.read_text(encoding="utf-8"))
+    assert result["summary"] == scan["summary"]
+    assert "install" not in result["packages"][0]
+    assert set(result["packages"][1]["install"]) == {"3.14 win-arm64", "3.14t linux-x86_64"}
